@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>grid-simple-feature-aggregation</title>
+
+    <script type="text/javascript" src="/apps/2.0rc2/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define('CustomApp', {
+    extend: 'Rally.app.App',
+    componentCls: 'app',
+    layout: {
+	    type: 'table',
+	    columns: 2
+	},
+
+    launch: function() {
+
+    	var that = this;
+
+    	console.log("launch");
+
+        var store = Ext.create('Rally.data.wsapi.Store', {
+            model: 'PortfolioItem/Feature',
+            filters : [{
+                property : 'State.Name',
+                operator : '=',
+                value : 'Develop'
+            }],
+            fetch : ["Name","FormattedID","Parent","UserStories"],
+            // fetch : true,
+            autoLoad: false
+        });
+
+        store.load().then({
+
+        	success : function(features) {
+        		console.log("features",features);
+
+				var promises = _.map(features,function(feature){
+					return feature.getCollection("UserStories").load()
+				});
+
+				Deft.Promise.all(promises).then({
+					success : function(stories) {
+						console.log("stories",stories);
+
+						that.add(
+							_.map(stories,function(fs,i){
+								return[
+									Ext.create('Ext.panel.Panel', {
+									    width: 200,
+									    html: features[i].get("Name")
+									}),
+									Ext.create('Ext.panel.Panel', {
+									    width: 200,
+									    html: that.storyPercentDone(fs)
+									})
+								]
+							})
+						)
+					}
+				})
+        	}
+        })
+    },
+
+    storyPercentDone : function(featureStories) {
+
+    	var percentDone = _.reduce(featureStories,function(total,story){
+
+    		var pd = 0;
+    		switch(story.get("ScheduleState")) {
+    			case "Defined": pd = 0; break;
+    			case "In-Progress": pd = 40; break;
+    			case "Completed": pd = 80; break;
+    			case "Accepted": pd = 100; break;
+    		}
+    		return total + pd;
+
+    	},0);
+
+    	return ( featureStories.length > 0 ? percentDone / featureStories.length : 0);
+
+    }
+});
+
+
+            Rally.launchApp('CustomApp', {
+                name:"grid-simple-feature-aggregation",
+	            parentRepos:""
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        .app {
+     /* Add app styles here */
+}
+
+    </style>
+</head>
+<body></body>
+</html>
